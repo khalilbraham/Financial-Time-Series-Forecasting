@@ -1,4 +1,4 @@
-# ML for Time Series - Project README
+# Time series forecasting: ARIMA vs Deep Learning
 
 ## Project Overview
 
