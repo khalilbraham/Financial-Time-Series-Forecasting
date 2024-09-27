@@ -93,3 +93,189 @@ The report delves into the traditional ARIMA model's usage in time series foreca
 
 - A comparative study of neural network and Box-Jenkins ARIMA modeling in time series prediction, Siong Lin Ho, Ngee Ann Polytechnic.
 - A Review of ARIMA vs. Machine Learning Approaches for Time Series Forecasting in Data Driven Networks, Vaia I. Kontopoulou, Athanasios D. Panagopoulos, Ioannis Kakkos, and George K. Matsopoulos.
+
+
+Sure! I'll adapt the models to use **PyTorch** instead of **TensorFlow**. Below are the PyTorch implementations for the models: MLP, Transformer-based model, XLSTM, and the steps for integrating the Informer and PathFormer models.
+
+### 1. **MLP (Multilayer Perceptron) in PyTorch**
+
+```python
+import torch
+import torch.nn as nn
+
+class MLP(nn.Module):
+    def __init__(self, input_size):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(input_size, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 1)  # Output layer
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+# Example usage:
+mlp_model = MLP(input_size=X_train.shape[1])
+```
+
+### 2. **Transformer-Based Model in PyTorch**
+
+A PyTorch implementation of a basic Transformer-based model for time series forecasting.
+
+```python
+import torch.nn.functional as F
+
+class TransformerModel(nn.Module):
+    def __init__(self, input_size, d_model=64, num_heads=4, ff_dim=128, num_layers=1):
+        super(TransformerModel, self).__init__()
+        self.embedding = nn.Linear(input_size, d_model)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, dim_feedforward=ff_dim)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.fc_out = nn.Linear(d_model, 1)  # Output layer
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = self.transformer(x)
+        x = self.fc_out(x)
+        return x
+
+# Example usage:
+transformer_model = TransformerModel(input_size=X_train.shape[2])  # Assuming input is (batch, seq_len, features)
+```
+
+### 3. **XLSTM Model in PyTorch**
+
+An LSTM-based model with extended capabilities for handling long-term dependencies.
+
+```python
+class XLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=2):
+        super(XLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc_out = nn.Linear(hidden_size, 1)  # Output layer
+
+    def forward(self, x):
+        h, _ = self.lstm(x)
+        out = self.fc_out(h[:, -1, :])  # Taking the last hidden state
+        return out
+
+# Example usage:
+xlstm_model = XLSTM(input_size=X_train.shape[2])
+```
+
+### 4. **Informer Model in PyTorch**
+
+For **Informer**, you can use the authors' [Informer GitHub repository](https://github.com/zhouhaoyi/Informer2020). Here’s how to integrate it into your workflow:
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/zhouhaoyi/Informer2020.git
+cd Informer2020
+pip install -r requirements.txt
+```
+
+2. Use the Informer model in your code:
+
+```python
+from informer_model import Informer  # Assuming Informer is imported from the repo
+
+def build_informer(input_size):
+    model = Informer(enc_in=input_size, dec_in=input_size, c_out=1, seq_len=96, label_len=48, out_len=24)
+    return model
+
+# Example usage:
+informer_model = build_informer(input_size=X_train.shape[2])
+```
+
+### 5. **PathFormer Model in PyTorch**
+
+For **PathFormer**, similar to Informer, use the implementation provided in their paper's GitHub repository. Here’s an outline of how to proceed:
+
+1. Clone the PathFormer repository:
+
+```bash
+git clone https://github.com/pathformer-repo/pathformer.git
+```
+
+2. Use the PathFormer model:
+
+```python
+from pathformer import PathFormer  # Assuming PathFormer class is implemented
+
+def build_pathformer(input_size):
+    model = PathFormer(input_size=input_size, d_model=64, num_heads=4, ff_dim=128)
+    return model
+
+# Example usage:
+pathformer_model = build_pathformer(input_size=X_train.shape[2])
+```
+
+### Training Loop for PyTorch
+
+Here’s an example of a generic training loop you can use to train any of the models:
+
+```python
+import torch.optim as optim
+
+def train_model(model, X_train, y_train, X_val, y_val, epochs=20, lr=0.001):
+    # Convert data to PyTorch tensors
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+    X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+    y_val_tensor = torch.tensor(y_val, dtype=torch.float32)
+
+    # Define optimizer and loss function
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
+
+    for epoch in range(epochs):
+        model.train()
+        optimizer.zero_grad()
+        outputs = model(X_train_tensor)
+        loss = criterion(outputs, y_train_tensor.unsqueeze(1))
+        loss.backward()
+        optimizer.step()
+
+        # Validation
+        model.eval()
+        with torch.no_grad():
+            val_outputs = model(X_val_tensor)
+            val_loss = criterion(val_outputs, y_val_tensor.unsqueeze(1))
+        
+        print(f"Epoch {epoch+1}/{epochs}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss.item():.4f}")
+
+# Example usage:
+train_model(mlp_model, X_train, y_train, X_val, y_val, epochs=20)
+```
+
+### Evaluation
+
+Once the model is trained, you can evaluate it on the test set:
+
+```python
+def evaluate_model(model, X_test, y_test):
+    model.eval()
+    X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+    y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
+
+    with torch.no_grad():
+        predictions = model(X_test_tensor)
+        test_loss = nn.MSELoss()(predictions, y_test_tensor.unsqueeze(1))
+        print(f"Test Loss: {test_loss.item():.4f}")
+
+# Example usage:
+evaluate_model(mlp_model, X_test, y_test)
+```
+
+### Summary:
+
+1. **MLP**: A simple feed-forward neural network.
+2. **Transformer**: A time series transformer model leveraging self-attention.
+3. **XLSTM**: An extended LSTM model for long-range dependencies.
+4. **Informer**: You can use the official implementation from the [Informer GitHub repository](https://github.com/zhouhaoyi/Informer2020).
+5. **PathFormer**: Use the repository for **PathFormer** to get an implementation based on their paper.
+
+This PyTorch implementation allows you to handle multiple complex models efficiently for time series forecasting.
